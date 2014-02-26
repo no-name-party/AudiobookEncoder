@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<opt>
+	<itunes>1</itunes>
+	<shutdown>0</shutdown>
+	<task>1</task>
+	<expdest></expdest>
+	<apreset>
+	</apreset>
+    <expand>1</expand>
+    <playfile>0</playfile>
+</opt>
