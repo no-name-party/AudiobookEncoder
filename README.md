@@ -4,8 +4,7 @@ AudiobookEncoder
 Convert mp3 into m4b audiobooks.
 
 
-Features:
-
+**Features:**
 * convert multiple mp3 -> m4b
 * add embedded cover
 * edit metatags
