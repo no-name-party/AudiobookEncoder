@@ -1,5 +1,7 @@
 # -*- coding: utf8 -*-
 
+"""Usage: python setup.py py2app"""
+
 #IMPMORTS
 import shutil
 import plistlib
