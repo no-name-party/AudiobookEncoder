@@ -4,7 +4,7 @@ __author__ = "Dennis Oesterle"
 __copyright__ = "Copyright 2014, Dennis Oesterle"
 __license__ = "CC BY-NC-SA - Attribution-NonCommercial-ShareAlike"
 __appname__ = "Audiobook Encoder"
-__version__ = "0.9b"
+__version__ = "0.91b"
 __email__ = "dennis@no-name-party.de"
 
 #===============================================================================
@@ -235,10 +235,8 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
             if missingFiles:
                 self.errorLog(missingFiles, mesg = False, error_log = False)
             else:
-                exportUi = LogUi(self, label = "Exporting...", msg = "{0} Audiobook(s)\nPlease do not move any files until this process is finished.".format(len(somthing_to_export)), fontSize = [20, 12])
-                AudioFileTools.exportAction(xml_cache_root, xml_options_root, _script_dir)
-                exportUi.optionHeader.setText("Exporting... Done!")
-                exportUi.msg.setText("")
+                exportUi = LogUi(self, label = "Exporting...", msg = "Please do not move any files until this process is finished.", counter_msg = "0 / {0}".format(len(somthing_to_export)),fontSize = [20, 12], progress = True, close = False)
+                AudioFileTools.exportAction(xml_cache_root, xml_options_root, _script_dir, exportUi)
         else:
             LogUi(self, label = "Exporting Error!", msg = "No audiobooks are activ.", fontSize = [20, 12])
 
@@ -822,7 +820,7 @@ class AboutMenu(QtGui.QDialog):
 class LogUi(QtGui.QDialog):
     """Error logging window"""
 
-    def __init__(self, parent, label = None, msg = None, fontSize = [15, 12]):
+    def __init__(self, parent, label = None, msg = None, counter_msg = False, fontSize = [15, 12], progress = False, close = True):
         super(LogUi, self).__init__(parent)
         self.resize(440, 200)
 
@@ -836,7 +834,28 @@ class LogUi(QtGui.QDialog):
         self.msg.setFont(QtGui.QFont("Arial", fontSize[1], QtGui.QFont.Bold))
         self.msg.setStyleSheet("QLabel {color: grey;}")
 
+        # disable user input to close window during export
+        self.want_to_close = close
+
+        if progress:
+            self.progressbar = QtGui.QProgressBar(self)
+            self.progressbar.setGeometry(20, 125, 400, 100)
+            self.progressbar.setMinimum(1)
+            self.progressbar.setMaximum(100)
+
+        if counter_msg:
+            # counter for export
+            self.counter = QtGui.QLabel(counter_msg, self)
+            self.counter.setGeometry(210, 110, 100, 50)
+            self.counter.setFont(QtGui.QFont("Arial", fontSize[1], QtGui.QFont.Bold))
+            self.counter.setStyleSheet("QLabel {color: grey;}")
+
         self.open()
+
+    def keyPressEvent(self, event):
+        if self.want_to_close:
+            if event.key() == QtCore.Qt.Key_Escape:
+                self.close()
 
 class TextBox:
     """textbox with header"""

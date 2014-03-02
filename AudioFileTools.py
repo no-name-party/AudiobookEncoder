@@ -13,7 +13,10 @@ import subprocess
 import xml.etree.ElementTree as ET
 import Image
 import sys
+import threading
+import math
 from multiprocessing.dummy import Pool
+from Foundation import NSAutoreleasePool
 reload(sys)
 sys.setdefaultencoding("UTF8")
 
@@ -48,13 +51,6 @@ def getFileDuration(path_to_audio):
     afinfo = ["afinfo", "-b", str(path_to_audio)]
     process = subprocess.Popen(afinfo, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     stdout, stderr = process.communicate()
-
-    """
-    <-- DELETE -->
-    ffmpeg = [_ffmpeg_path, "-f", "mp3", "-i", str(path_to_audio)]
-    index = stdout.index("Duration")
-    duration = stdout[(index + 10):(index + 18)]
-    """
 
     # search by index for the seconds of file
     file_sec =  round(float(stdout[(stdout.index("----") + 4):(stdout.index(" sec"))]))
@@ -441,7 +437,8 @@ def readPresetAuthor(xml_options_root, _options_dir, menu = False, menu_item = F
 #export functions===============================================================
 
 def preExportActions(xml_cache_root):
-    
+    """return a list of exportable files"""
+
     def splitFiles(book_name, xml_cache_root, length = None):
         time_parts = length.split(":")    
         h = int(time_parts[0])
@@ -491,15 +488,17 @@ def preExportActions(xml_cache_root):
 
     return exp_books
 
-def exportAction(xml_cache_root, xml_options_root, _script_dir):
+def exportAction(xml_cache_root, xml_options_root, _script_dir, exportUi):
     """audiobook export"""
 
-    # list of exportable books
+    # list of exportable books with files and lenght
     ls_books = preExportActions(xml_cache_root)
 
-    def expThread(audiobook):
-    #for audiobook in ls_books:
+    def multiprocessExport(audiobook):
+        #for audiobook in ls_books:
+        NSAutoreleasePool.alloc().init() # we need this because this func is in another thread, qt can't take care of this
 
+        # basic audiobook params
         a_name = audiobook[0]
         a_parts = len(audiobook[1])
         a_files = audiobook[1]
@@ -515,10 +514,6 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir):
         for n, each in enumerate(a_files):
             # convert all files to one large string
             if len(each) >= 2:
-                """
-                <-- DELETE -->
-                a_files_str = "concat:" + "|".join(each)
-                """
                 a_files_str = each
                 parts = [1,1]
 
@@ -535,18 +530,7 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir):
                 parts = [1,1]
                 final_name = a_dest + a_name + ".m4b"
 
-            print parts, final_name, a_files_str
-            """
-            <-- DELETE -->
-            # "-f" = force file read when file is broken
-            # "-threads" = number of threads, 0 is automatic
-            # "-map_metadata = -1" = copy no metadata from the original
-            # "-vn" = deletes video stream
-            # "-y" = overwrite file if allready exists
-            # "-ac 2" = number of audiochannels
-            ffmpeg_cmd = [_ffmpeg_path, "-f", "mp3", "-i", a_files_str, "-c:a", "libfdk_aac", "-b:a", ab_quality, "-ac", "2", "-threads", "0", "-map_metadata", "-1", "-map", "a", "-vn", "-y",  final_name]
-            process = subprocess.Popen(ffmpeg_cmd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
-            """
+            # print parts, final_name, a_files_str
 
             # "-sv" = skip errors and go on with conversion, print some info on files being converted
             # "-b" = bitrate in KBps
@@ -559,11 +543,36 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir):
 
             postExportAction(xml_cache_root, xml_options_root, _script_dir, a_name, final_name, parts)
 
+            # progressbar
+            cur_value = exportUi.progressbar.value()
+            value_add_progressbar = int(math.ceil(float(100. / len(ls_books))))
+            new_value = cur_value + value_add_progressbar
+
+            if new_value >= 100:
+                new_value = 100
+
+            exportUi.progressbar.setValue(new_value)
+            counter_text = exportUi.counter.text()
+            new_counter_text = "{0} / {1}".format((int(counter_text.split(" / ")[0]) + 1), counter_text.split(" / ")[1])
+            exportUi.counter.setText(new_counter_text)
+
+            # when done...
+            if exportUi.progressbar.value() >= 100:
+                exportUi.want_to_close = True
+                exportUi.optionHeader.setText("Exporting... Done!")
+                exportUi.msg.setText("")
+
     if ls_books:
-        pool = Pool(int(readOptionsXml(xml_options_root, "task")))
-        pool.map(expThread, ls_books)
-        pool.close()
-        pool.join()
+        def pool():
+            # multiprocessing depending on cpu cores
+            pool = Pool(int(readOptionsXml(xml_options_root, "task")))
+            pool.map(multiprocessExport, ls_books)
+            pool.close()
+            pool.join()
+
+        # no freezed ui with threads
+        t = threading.Thread(target = pool)
+        t.start()
 
 def postExportAction(xml_cache_root, xml_options_root, _script_dir, audiobook_name, m4b_file, tracknumber):
     """adding meta tags, cover and itunes"""
@@ -595,14 +604,6 @@ def postExportAction(xml_cache_root, xml_options_root, _script_dir, audiobook_na
     
     if coverImage:
         addCoverToM4B(m4b_file, coverImage)
-
-    """
-    <-- DELETE -->
-    # rename files
-    old_name = m4a_file
-    new_name = os.path.dirname(m4a_file) + "/" + tags["title"][0] + ".m4b"   
-    os.rename(old_name, new_name)
-    """
 
     qtfaststart_dir = _script_dir + "/qtfaststart"
     qtfaststart_cmd = [qtfaststart_dir, m4b_file]
