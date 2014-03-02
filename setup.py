@@ -6,6 +6,7 @@
 import shutil
 import plistlib
 import AudiobookEncoder
+from PyQt4 import QtCore
 from setuptools import setup
 
 APP = ["AudiobookEncoder.py"]
@@ -25,13 +26,15 @@ setup(
     setup_requires=['py2app'],
 )
 
+_script_dir = QtCore.QDir.currentPath()
+
 # copy some binaries and edits plist
-shutil.copy2("/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/abbinder", "/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/dist/AudiobookEncoder.app/Contents/Resources/")
-shutil.copy2("/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/qtfaststart", "/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/dist/AudiobookEncoder.app/Contents/Resources/")
+shutil.copy2(_script_dir + "/abbinder", _script_dir + "/dist/AudiobookEncoder.app/Contents/Resources/")
+shutil.copy2(_script_dir + "/qtfaststart", _script_dir + "/dist/AudiobookEncoder.app/Contents/Resources/")
 
-shutil.move("/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/dist/AudiobookEncoder.app", "/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/")
+shutil.move(_script_dir + "/dist/AudiobookEncoder.app", _script_dir)
 
-plist = plistlib.readPlist("/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/AudiobookEncoder.app/Contents/Info.plist")
+plist = plistlib.readPlist(_script_dir + "/AudiobookEncoder.app/Contents/Info.plist")
 plist_changes = [("CFBundleName", "Audiobook Encoder"),
                 ("CFBundleDisplayName", "Audiobook Encoder"),
                 ("NSHumanReadableCopyright", "Dennis Oesterle \n" + AudiobookEncoder.__license__),
@@ -41,7 +44,7 @@ plist_changes = [("CFBundleName", "Audiobook Encoder"),
 for each in plist_changes:
     plist[each[0]] = each[1]
 
-plistlib.writePlist(plist, "/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/AudiobookEncoder.app/Contents/Info.plist")
+plistlib.writePlist(plist, _script_dir + "/AudiobookEncoder.app/Contents/Info.plist")
 
-shutil.rmtree("/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/build")
-shutil.rmtree("/Users/dennisbeckstein/Dropbox/scripts/python/AudiobookEncoder/dist")
+shutil.rmtree(_script_dir + "/build")
+shutil.rmtree(_script_dir + "/dist")
