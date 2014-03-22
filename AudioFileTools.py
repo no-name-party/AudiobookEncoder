@@ -530,7 +530,7 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir, exportUi):
                 parts = [1,1]
                 final_name = a_dest + a_name + ".m4b"
 
-            # print parts, final_name, a_files_str
+            #print parts, final_name, a_files_str
 
             # "-sv" = skip errors and go on with conversion, print some info on files being converted
             # "-b" = bitrate in KBps
@@ -543,24 +543,27 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir, exportUi):
 
             postExportAction(xml_cache_root, xml_options_root, _script_dir, a_name, final_name, parts)
 
-            # progressbar
-            cur_value = exportUi.progressbar.value()
-            value_add_progressbar = int(math.ceil(float(100. / len(ls_books))))
-            new_value = cur_value + value_add_progressbar
+            if not parts == [1, 2]:
+                # check if the book has more parts and finnish it before reenable the gui
 
-            if new_value >= 100:
-                new_value = 100
+                # progressbar
+                cur_value = exportUi.progressbar.value()
+                value_add_progressbar = int(math.ceil(float(100. / len(ls_books))))
+                new_value = cur_value + value_add_progressbar
 
-            exportUi.progressbar.setValue(new_value)
-            counter_text = exportUi.counter.text()
-            new_counter_text = "{0} / {1}".format((int(counter_text.split(" / ")[0]) + 1), counter_text.split(" / ")[1])
-            exportUi.counter.setText(new_counter_text)
+                if new_value >= 100:
+                    new_value = 100
 
-            # when done...
-            if exportUi.progressbar.value() >= 100:
-                exportUi.want_to_close = True
-                exportUi.optionHeader.setText("Exporting... Done!")
-                exportUi.msg.setText("")
+                exportUi.progressbar.setValue(new_value)
+                counter_text = exportUi.counter.text()
+                new_counter_text = "{0} / {1}".format((int(counter_text.split(" / ")[0]) + 1), counter_text.split(" / ")[1])
+                exportUi.counter.setText(new_counter_text)
+
+                # when done...
+                if exportUi.progressbar.value() >= 100:
+                    exportUi.want_to_close = True
+                    exportUi.optionHeader.setText("Exporting... Done!")
+                    exportUi.msg.setText("")
 
     if ls_books:
         def pool():
