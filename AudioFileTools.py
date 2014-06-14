@@ -31,7 +31,7 @@ def getFiles(path_to_file):
         for dirpath, dirnames, filenames in os.walk(path_to_file):
             if not dirpath.endswith("/"):
                 dirpath = dirpath + "/"
-            for filename in [f for f in filenames if f.endswith("mp3")]:
+            for filename in [f for f in filenames if f.lower().endswith("mp3")]:
                 file_duration = getFileDuration(os.path.join(dirpath + filename))
                 file_info.append(["FOLDER", filename, file_duration, (dirpath + filename)])
 
@@ -39,7 +39,7 @@ def getFiles(path_to_file):
     
     # files
     if not os.path.isdir(path_to_file):
-        if path_to_file.endswith("mp3"):
+        if path_to_file.lower().endswith("mp3"):
             file_duration = getFileDuration(path_to_file)
             file_info = ["FILE", os.path.basename(path_to_file), file_duration, path_to_file]
     
@@ -530,7 +530,7 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir, exportUi):
                 parts = [1,1]
                 final_name = a_dest + a_name + ".m4b"
 
-            #print parts, final_name, a_files_str
+            print parts, final_name, a_files_str
 
             # "-sv" = skip errors and go on with conversion, print some info on files being converted
             # "-b" = bitrate in KBps

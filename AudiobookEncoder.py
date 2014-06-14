@@ -4,7 +4,7 @@ __author__ = "Dennis Oesterle"
 __copyright__ = "Copyright 2014, Dennis Oesterle"
 __license__ = "CC BY-NC-SA - Attribution-NonCommercial-ShareAlike"
 __appname__ = "Audiobook Encoder"
-__version__ = "0.91b"
+__version__ = "0.92b"
 __email__ = "dennis@no-name-party.de"
 
 #===============================================================================
@@ -189,7 +189,7 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
         sel_books = self.book_list.selectedItems()
 
         for each in sel_books:
-            if not each.text(0).endswith(".mp3"):
+            if not each.text(0).lower().endswith(".mp3"):
                 self.author.lineEdit.setText(preset[0])
                 AudioFileTools.saveToXml(each.text(0), xml_cache_root, _cache_dir, author = [True, preset[0]])
 
@@ -249,7 +249,7 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
             self.exportState.setStyleSheet("QCheckBox {color: " + text_colors[1] + ";}")
 
             sel_item = self.book_list.selectedItems()[0]
-            if sel_item.text(0).endswith(".mp3"):
+            if sel_item.text(0).lower().endswith(".mp3"):
                 book_index = self.book_list.currentIndex().parent().row()
                 sel_item = self.book_list.topLevelItem(book_index)
 
@@ -350,11 +350,11 @@ class TreeWidget(QtGui.QTreeWidget):
         if len(self.selectedItems()) == 1:
             selected_book = self.selectedItems()[0].text(0)
 
-            if selected_book.endswith(".mp3"):
+            if selected_book.lower().endswith(".mp3"):
                 book_index = self.currentIndex().parent().row()
                 selected_book =  self.topLevelItem(book_index).text(0)
 
-            if not selected_book.endswith(".mp3"):
+            if not selected_book.lower().endswith(".mp3"):
                 self.titleWidget.lineEdit.setText(AudioFileTools.readFromXml(xml_cache_root, selected_book, title = True))
                 self.authorWidget.lineEdit.setText(AudioFileTools.readFromXml(xml_cache_root, selected_book, author = True))
                 self.commentWidget.lineEdit.setText(AudioFileTools.readFromXml(xml_cache_root, selected_book, comments = True))
@@ -490,14 +490,14 @@ class TreeWidget(QtGui.QTreeWidget):
     def changeItemName(self, new_audiobook_name):
         if self.selectedItems():
             if new_audiobook_name:
-                if new_audiobook_name.endswith(".mp3"):
+                if new_audiobook_name.lower().endswith(".mp3"):
                     LogUi(self, label = "Name Error!", msg = "You can't add \".mp3\" to audobook names.", fontSize = [20, 12])
                     new_audiobook_name = new_audiobook_name[:-4]
 
                 selected_item = self.selectedItems()[0]
                 selected_book = self.selectedItems()[0].text(0)
 
-                if selected_book.endswith(".mp3"):
+                if selected_book.lower().endswith(".mp3"):
                     book_index = self.currentIndex().parent().row()
                     selected_item = self.topLevelItem(book_index)
                     selected_book =  self.topLevelItem(book_index).text(0)
@@ -515,7 +515,7 @@ class TreeWidget(QtGui.QTreeWidget):
             for each_item in self.selectedItems():
                 item_name = each_item.text(0)
 
-                if not item_name.endswith(".mp3"):
+                if not item_name.lower().endswith(".mp3"):
                     # delete the hole audiobook
                     # xml delete
                     AudioFileTools.deleteAudiobook(item_name, xml_cache_root, _cache_dir)
@@ -561,7 +561,7 @@ class TreeWidget(QtGui.QTreeWidget):
                     selected_item_name = each_item.text(0)
                     self.setCurrentItem(each_item)
 
-                    if selected_item_name.endswith(".mp3"):
+                    if selected_item_name.lower().endswith(".mp3"):
                         book_index = self.currentIndex().parent().row()
                         self.setItemSelected(each_item, False)
                         each_item = self.topLevelItem(book_index)
@@ -596,7 +596,7 @@ class TreeWidget(QtGui.QTreeWidget):
                 playfile = int(AudioFileTools.readOptionsXml(xml_options_root, "playfile"))
                 item_sel =  self.selectedItems()[0].text(0).split("    ")
 
-                if item_sel[0].endswith(".mp3"):
+                if item_sel[0].lower().endswith(".mp3"):
                     book_index = self.currentIndex().parent().row()
                     selected_item = self.topLevelItem(book_index)
                     selected_book =  self.topLevelItem(book_index).text(0)
@@ -631,7 +631,7 @@ class TreeWidget(QtGui.QTreeWidget):
 
         item_clicked =  self.selectedItems()[0].text(0).split("    ")
 
-        if item_clicked[0].endswith(".mp3"):
+        if item_clicked[0].lower().endswith(".mp3"):
             book_index = self.currentIndex().parent().row()
             selected_item = self.topLevelItem(book_index)
             selected_book =  self.topLevelItem(book_index).text(0)
