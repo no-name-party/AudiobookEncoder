@@ -130,6 +130,22 @@ def checkFiles(xml_cache_root):
 
     return removed_files
 
+def checkMp3Errors(xml_cache_root):
+    def checkFile(eachFile):
+        if eachFile.lower().endswith("mp3"):
+            #print eachFile
+            ffmpegCmd = ["ffmpeg", "-v", "error", "-i", eachFile, "-f", "null", "-"]
+
+            process = subprocess.Popen(ffmpegCmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            stdout, stderr = process.communicate()
+            if stdout:
+                print "\nError : ", eachFile
+
+    pool = Pool(7)
+    pool.map(checkFile, allFiles)
+    pool.close()
+    pool.join()
+
 def checkCover(xml_cache_root, cover):
     """check if cover is available"""
 
@@ -346,6 +362,28 @@ def addCover(cover_url, xml_cache_root, _cache_dir, audiobook_name = None, save_
     ET.ElementTree(xml_cache_root).write(_cache_dir, encoding = "utf-8", xml_declaration = True, method = "xml")
     
     return cover_url
+
+def resizeCover(cover_url, info=False, scale=False):
+    """resize the cover"""
+
+    cover = Image.open(cover_url)
+    w, h = cover.size
+
+    if info:
+        ratio = float(w)/float(h)
+        if not ratio == 1.0:
+            return [ratio, w, h]
+        else:
+            return [1.0]
+
+    if scale:
+        if not w == h:
+            size = (h, h)
+            cover = cover.resize(size, Image.ANTIALIAS) #@UndefinedVariable
+            cover.save(cover_url)
+            return True
+        else:
+            return False
 
 def deleteCover(audiobook_name, xml_cache_root, _cache_dir):
     for each_book in xml_cache_root.getchildren():

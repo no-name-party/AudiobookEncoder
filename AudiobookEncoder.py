@@ -4,7 +4,7 @@ __author__ = "Dennis Oesterle"
 __copyright__ = "Copyright 2014, Dennis Oesterle"
 __license__ = "CC BY-NC-SA - Attribution-NonCommercial-ShareAlike"
 __appname__ = "Audiobook Encoder"
-__version__ = "0.92b"
+__version__ = "0.923b"
 __email__ = "dennis@no-name-party.de"
 
 #===============================================================================
@@ -189,21 +189,25 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
         sel_books = self.book_list.selectedItems()
 
         for each in sel_books:
-            if not each.text(0).lower().endswith(".mp3"):
-                self.author.lineEdit.setText(preset[0])
-                AudioFileTools.saveToXml(each.text(0), xml_cache_root, _cache_dir, author = [True, preset[0]])
+            if each.text(0).lower().endswith(".mp3"):
+                selected_book =  each.parent().text(0)
+            else:
+                selected_book = each.text(0)
 
-                self.comment.lineEdit.setText(preset[1])
-                AudioFileTools.saveToXml(each.text(0), xml_cache_root, _cache_dir, comment = [True, preset[1]])
+            self.author.lineEdit.setText(preset[0])
+            AudioFileTools.saveToXml(selected_book, xml_cache_root, _cache_dir, author = [True, preset[0]])
 
-                self.genre.lineEdit.setText(preset[2])
-                AudioFileTools.saveToXml(each.text(0), xml_cache_root, _cache_dir, genre = [True, preset[2]])
+            self.comment.lineEdit.setText(preset[1])
+            AudioFileTools.saveToXml(selected_book, xml_cache_root, _cache_dir, comment = [True, preset[1]])
 
-                self.export_path.lineEdit.setText(preset[3])
-                AudioFileTools.saveToXml(each.text(0), xml_cache_root, _cache_dir, destination = preset[3])
+            self.genre.lineEdit.setText(preset[2])
+            AudioFileTools.saveToXml(selected_book, xml_cache_root, _cache_dir, genre = [True, preset[2]])
 
-                self.build_options.setCurrentIndex(int(preset[4].split(";")[0]))
-                AudioFileTools.saveToXml(each.text(0), xml_cache_root, _cache_dir, qualityPresets, quality = [True, int(preset[4].split(";")[0])])
+            self.export_path.lineEdit.setText(preset[3])
+            AudioFileTools.saveToXml(selected_book, xml_cache_root, _cache_dir, destination = preset[3])
+
+            self.build_options.setCurrentIndex(int(preset[4].split(";")[0]))
+            AudioFileTools.saveToXml(selected_book, xml_cache_root, _cache_dir, qualityPresets, quality = [True, int(preset[4].split(";")[0])])
 
     def errorLog(self, error_msg = False, mesg = False, error_log = True):
         """error log for the user"""
@@ -244,18 +248,20 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
         """active audiobooks for export"""
 
         if self.book_list.selectedItems():
-            AudioFileTools.saveToXml(self.book_name.lineEdit.text(), xml_cache_root, _cache_dir, export = [True, int(self.exportState.isChecked())])
-            text_colors = AudioFileTools.readFromXml(xml_cache_root, self.book_name.lineEdit.text(), export = True)[1:]
-            self.exportState.setStyleSheet("QCheckBox {color: " + text_colors[1] + ";}")
+            for each_item in self.book_list.selectedItems():
+                selected_book = each_item.text(0)
 
-            sel_item = self.book_list.selectedItems()[0]
-            if sel_item.text(0).lower().endswith(".mp3"):
-                book_index = self.book_list.currentIndex().parent().row()
-                sel_item = self.book_list.topLevelItem(book_index)
+                if selected_book.lower().endswith(".mp3"):
+                    each_item = each_item.parent()
+                    selected_book = each_item.text(0)
 
-            #change text color
-            sel_item.setTextColor(0, QtGui.QColor(text_colors[0]))
-            sel_item.setTextColor(1, QtGui.QColor(text_colors[0]))
+                AudioFileTools.saveToXml(selected_book, xml_cache_root, _cache_dir, export = [True, int(self.exportState.isChecked())])
+                text_colors = AudioFileTools.readFromXml(xml_cache_root, selected_book, export = True)[1:]
+                self.exportState.setStyleSheet("QCheckBox {color: " + text_colors[1] + ";}")
+
+                #change text color
+                each_item.setTextColor(0, QtGui.QColor(text_colors[0]))
+                each_item.setTextColor(1, QtGui.QColor(text_colors[0]))
 
     def openBrowser(self, page):
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(page))
@@ -275,7 +281,15 @@ class CoverWidget(QtGui.QLabel):
 
         self.setAcceptDrops(True)
 
+        self.cover = QtGui.QPixmap()
+
         self.titleWidget = widget
+
+        self.warning = QtGui.QLabel("", parent)
+        self.warning.setGeometry(300, 510, 50, 50)
+        self.warning.setFont(font)
+        self.warning.setStyleSheet("QLabel {color: crimson;}")
+        self.warning.hide()
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -293,8 +307,10 @@ class CoverWidget(QtGui.QLabel):
                 else:
                     cover_path = AudioFileTools.addCover(url.path(), save_xml = False)
 
-                self.cover = QtGui.QPixmap(cover_path)
+                self.cover.load(cover_path)
                 self.setPixmap(self.cover.scaled(280, 280, aspectRatioMode = QtCore.Qt.KeepAspectRatio))
+
+                self.imageWarning(image_ratio=AudioFileTools.resizeCover(cover_path, info=True))
 
                 event.acceptProposedAction()
 
@@ -302,9 +318,52 @@ class CoverWidget(QtGui.QLabel):
             super(CoverWidget, self).dropEvent(event)
 
     def mouseDoubleClickEvent(self, event):
+        self.deleteCoverImage()
+
+    def contextMenuEvent(self, event):
+        self.menu = QtGui.QMenu(self)
+
+        action_resize = QtGui.QAction("Scale", self)
+        self.menu.addAction(action_resize)
+
+        if self.titleWidget.lineEdit.text():
+            audiobook_name = self.titleWidget.lineEdit.text()
+            cover_path = AudioFileTools.readFromXml(xml_cache_root, audiobook_name, cover = True)
+            if cover_path:
+                action_resize.triggered.connect(lambda: self.resizeReplaceCover(cover_path))
+
+        action_del = QtGui.QAction("Delete", self)
+        self.menu.addAction(action_del)
+        action_del.triggered.connect(self.deleteCoverImage)
+
+        self.menu.popup(QtGui.QCursor.pos())
+
+    def resizeReplaceCover(self, cover_path):
+        """resize and replace cover"""
+
+        resize_completed = AudioFileTools.resizeCover(cover_path, scale=True)
+        if resize_completed:
+            self.cover.load(cover_path)
+            self.setPixmap(self.cover.scaled(280, 280, aspectRatioMode = QtCore.Qt.KeepAspectRatio))
+            self.imageWarning(image_ratio=AudioFileTools.resizeCover(cover_path, info=True))
+
+
+    def imageWarning(self, image_ratio):
+        """check if the image ratio is 1"""
+
+        if not image_ratio[0] == 1.0:
+            self.warning.setText("!")
+            self.warning.setToolTip("Size: <br>" + str(image_ratio[1]) + " * " + str(image_ratio[2]))
+            self.warning.show()
+        else:
+             self.warning.hide()
+
+    def deleteCoverImage(self):
         audiobook_name = self.titleWidget.lineEdit.text()
         AudioFileTools.deleteCover(audiobook_name, xml_cache_root, _cache_dir)
         self.setText("Drag and Drop <br> Cover Artwork")
+        self.warning.hide()
+
 
 # QTreeWidget
 class TreeWidget(QtGui.QTreeWidget):
@@ -351,8 +410,7 @@ class TreeWidget(QtGui.QTreeWidget):
             selected_book = self.selectedItems()[0].text(0)
 
             if selected_book.lower().endswith(".mp3"):
-                book_index = self.currentIndex().parent().row()
-                selected_book =  self.topLevelItem(book_index).text(0)
+                selected_book = self.selectedItems()[0].parent().text(0)
 
             if not selected_book.lower().endswith(".mp3"):
                 self.titleWidget.lineEdit.setText(AudioFileTools.readFromXml(xml_cache_root, selected_book, title = True))
@@ -362,9 +420,7 @@ class TreeWidget(QtGui.QTreeWidget):
                 self.export_pathWidget.lineEdit.setText(AudioFileTools.readFromXml(xml_cache_root, selected_book, destination = True))
                 self.buildOptionWidget.setCurrentIndex(int(AudioFileTools.readFromXml(xml_cache_root, selected_book, quality = True)[0]))
 
-                currentExportState = AudioFileTools.readFromXml(xml_cache_root, selected_book, export = True)
-                self.exportStateWidget.setChecked(int(currentExportState[0]))
-                self.exportStateWidget.setStyleSheet("QCheckBox {color: " + currentExportState[2] + ";}")
+                self.activateAudiobook(changeWidget=True)
 
                 #cover
                 if AudioFileTools.readFromXml(xml_cache_root, selected_book, cover = True):
@@ -372,11 +428,14 @@ class TreeWidget(QtGui.QTreeWidget):
 
                     if not AudioFileTools.checkCover(xml_cache_root, cover_path):
                         self.coverWidget.setText("Cover Artwork <br> not found")
+                        self.coverWidget.warning.hide()
                     else:
-                        self.cover = QtGui.QPixmap(cover_path)
-                        self.coverWidget.setPixmap(self.cover.scaled(280, 280, aspectRatioMode = QtCore.Qt.KeepAspectRatio))
+                        self.coverWidget.cover.load(cover_path)
+                        self.coverWidget.setPixmap(self.coverWidget.cover.scaled(280, 280, aspectRatioMode = QtCore.Qt.KeepAspectRatio))
+                        self.coverWidget.imageWarning(image_ratio=AudioFileTools.resizeCover(cover_path, info=True))
                 else:
                     self.coverWidget.setText("Drag and Drop <br> Cover Artwork")
+                    self.coverWidget.warning.hide()
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -498,9 +557,8 @@ class TreeWidget(QtGui.QTreeWidget):
                 selected_book = self.selectedItems()[0].text(0)
 
                 if selected_book.lower().endswith(".mp3"):
-                    book_index = self.currentIndex().parent().row()
-                    selected_item = self.topLevelItem(book_index)
-                    selected_book =  self.topLevelItem(book_index).text(0)
+                    selected_item = selected_item.parent()
+                    selected_book =  selected_item.text(0)
 
                 #write to xml
                 changed_book_name = AudioFileTools.saveToXml(selected_book, xml_cache_root, _cache_dir, new_audiobook_name = new_audiobook_name)
@@ -510,39 +568,9 @@ class TreeWidget(QtGui.QTreeWidget):
 
         if event.key() == QtCore.Qt.Key_Backspace:
             # delete files
-            root_item = self.invisibleRootItem()
+            self.deleteFiles()
 
-            for each_item in self.selectedItems():
-                item_name = each_item.text(0)
-
-                if not item_name.lower().endswith(".mp3"):
-                    # delete the hole audiobook
-                    # xml delete
-                    AudioFileTools.deleteAudiobook(item_name, xml_cache_root, _cache_dir)
-                    # item delete
-                    (each_item.parent() or root_item).removeChild(each_item)
-
-                    # clear all widgets
-                    self.titleWidget.lineEdit.setText("")
-                    self.authorWidget.lineEdit.setText("")
-                    self.commentWidget.lineEdit.setText("")
-                    self.genreWidget.lineEdit.setText("")
-                    self.coverWidget.setText("Drag and Drop <br> Cover Artwork")
-                    self.export_pathWidget.lineEdit.setText("")
-                    self.buildOptionWidget.setCurrentIndex(0)
-                    self.exportStateWidget.setChecked(1)
-                    self.exportStateWidget.setStyleSheet("QCheckBox {color: grey;}")
-                else:
-                    # delete mp3 file
-                    self.setCurrentItem(each_item)
-                    book_index = self.currentIndex().parent().row()
-                    selected_item = self.topLevelItem(book_index)
-                    audiobook_name =  self.topLevelItem(book_index).text(0)
-                    item_name =  item_name.split("    ")[1]
-                    AudioFileTools.deleteFile(audiobook_name, item_name, xml_cache_root, _cache_dir)
-                    (each_item.parent() or root_item).removeChild(each_item)
-
-            if not root_item.childCount():
+            if not self.invisibleRootItem().childCount():
                 self.item_list_helper.show()
 
         if event.key() == QtCore.Qt.Key_Right:
@@ -562,10 +590,8 @@ class TreeWidget(QtGui.QTreeWidget):
                     self.setCurrentItem(each_item)
 
                     if selected_item_name.lower().endswith(".mp3"):
-                        book_index = self.currentIndex().parent().row()
                         self.setItemSelected(each_item, False)
-                        each_item = self.topLevelItem(book_index)
-                        itemsToExpand.append(each_item)
+                        itemsToExpand.append(each_item.parent())
                     else:
                         itemsToExpand.append(each_item)
                         each_item.setExpanded(False)
@@ -592,32 +618,7 @@ class TreeWidget(QtGui.QTreeWidget):
 
         if event.key() == QtCore.Qt.Key_Space:
             # play / pause file
-            if len(self.selectedItems()) == 1:
-                playfile = int(AudioFileTools.readOptionsXml(xml_options_root, "playfile"))
-                item_sel =  self.selectedItems()[0].text(0).split("    ")
-
-                if item_sel[0].lower().endswith(".mp3"):
-                    book_index = self.currentIndex().parent().row()
-                    selected_item = self.topLevelItem(book_index)
-                    selected_book =  self.topLevelItem(book_index).text(0)
-                    files =  AudioFileTools.readFromXml(xml_cache_root, selected_book, files = True)
-
-                    # search for the clicked item in xml file and return path
-                    file_path = [each_file[2] for each_file in files if each_file[2] == item_sel[1]][0]
-
-                    if os.path.exists(file_path):
-                        afplayCMD = ["afplay", file_path]
-                        if not playfile:
-                            # play sound and set pid
-                            process = subprocess.Popen(afplayCMD, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, preexec_fn = os.setsid)
-                            AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, process.pid, "playfile")
-                        else:
-                            try:
-                                os.killpg(playfile, signal.SIGTERM)
-                                AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, "0", "playfile")
-                            except OSError:
-                                process = subprocess.Popen(afplayCMD, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, preexec_fn = os.setsid)
-                                AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, process.pid, "playfile")
+            self.playFile()
 
         if event.modifiers() == QtCore.Qt.ControlModifier:
             # select all audiobooks cmd+a
@@ -626,15 +627,38 @@ class TreeWidget(QtGui.QTreeWidget):
                 for each_book in range(self.invisibleRootItem().childCount()):
                     self.setItemSelected(self.invisibleRootItem().child(each_book), True)
 
+    def contextMenuEvent(self, event):
+
+        if self.selectedItems():
+            item_name = self.selectedItems()[-1].text(0)
+            self.menu = QtGui.QMenu(self)
+
+            actions = [["Open in Finder", self.openFolder], ["Play File", self.playFile], ["Activate", lambda: self.activateAudiobook(activate=True)], ["Deactivate", self.activateAudiobook], ["Check Files", ], ["Delete", self.deleteFiles]]
+
+            if int(AudioFileTools.readOptionsXml(xml_options_root, "playfile")):
+                actions[1][0] = "Stop File"
+            if not item_name.lower().endswith(".mp3"):
+                del actions[0:2]
+            if item_name.lower().endswith(".mp3"):
+                del actions[2:5]
+
+            for each_action in actions:
+                action = QtGui.QAction(each_action[0], self)
+                self.menu.addAction(action)
+                try:
+                    action.triggered.connect(each_action[1])
+                except:
+                    pass
+
+            self.menu.popup(QtGui.QCursor.pos())
+
     def openFolder(self):
         """double click and open a finder where the files are"""
 
         item_clicked =  self.selectedItems()[0].text(0).split("    ")
 
         if item_clicked[0].lower().endswith(".mp3"):
-            book_index = self.currentIndex().parent().row()
-            selected_item = self.topLevelItem(book_index)
-            selected_book =  self.topLevelItem(book_index).text(0)
+            selected_book =  self.selectedItems()[0].parent().text(0)
             files =  AudioFileTools.readFromXml(xml_cache_root, selected_book, files = True)
 
             # search for the clicked item in xml file and return path
@@ -644,6 +668,88 @@ class TreeWidget(QtGui.QTreeWidget):
                 subprocess.Popen(["open", file_path])
             else:
                 folder_err = LogUi(self, label = "Folder Error!", msg = "Can't find folder:\n" + file_path)
+
+    def deleteFiles(self):
+        """delete files"""
+
+        root_item = self.invisibleRootItem()
+
+        for each_item in self.selectedItems():
+            item_name = each_item.text(0)
+
+            if not item_name.lower().endswith(".mp3"):
+                # delete the hole audiobook
+                # xml delete
+                AudioFileTools.deleteAudiobook(item_name, xml_cache_root, _cache_dir)
+                # item delete
+                (each_item.parent() or root_item).removeChild(each_item)
+
+                # clear all widgets
+                self.titleWidget.lineEdit.setText("")
+                self.authorWidget.lineEdit.setText("")
+                self.commentWidget.lineEdit.setText("")
+                self.genreWidget.lineEdit.setText("")
+                self.coverWidget.setText("Drag and Drop <br> Cover Artwork")
+                self.coverWidget.warning.hide()
+                self.export_pathWidget.lineEdit.setText("")
+                self.buildOptionWidget.setCurrentIndex(0)
+                self.exportStateWidget.setChecked(1)
+                self.exportStateWidget.setStyleSheet("QCheckBox {color: grey;}")
+            else:
+                # delete mp3 file
+                self.setCurrentItem(each_item)
+                audiobook_name = each_item.parent().text(0)
+                item_name =  item_name.split("    ")[1]
+                AudioFileTools.deleteFile(audiobook_name, item_name, xml_cache_root, _cache_dir)
+                (each_item.parent() or root_item).removeChild(each_item)
+
+    def playFile(self):
+        """play/stop file"""
+
+        if len(self.selectedItems()) == 1:
+            item_sel =  self.selectedItems()[0].text(0).split("    ")
+            if item_sel[0].lower().endswith(".mp3"):
+                playfile = int(AudioFileTools.readOptionsXml(xml_options_root, "playfile"))
+
+                selected_book = self.selectedItems()[0].parent().text(0)
+                files =  AudioFileTools.readFromXml(xml_cache_root, selected_book, files = True)
+
+                # search for the clicked item in xml file and return path
+                file_path = [each_file[2] for each_file in files if each_file[2] == item_sel[1]][0]
+
+                if os.path.exists(file_path):
+                    afplayCMD = ["afplay", file_path]
+                    if not playfile:
+                        # play sound and set pid
+                        process = subprocess.Popen(afplayCMD, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, preexec_fn = os.setsid)
+                        AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, process.pid, "playfile")
+                    else:
+                        try:
+                            os.killpg(playfile, signal.SIGTERM)
+                            AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, "0", "playfile")
+                        except OSError:
+                            process = subprocess.Popen(afplayCMD, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, preexec_fn = os.setsid)
+                            AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, process.pid, "playfile")
+
+    def activateAudiobook(self, changeWidget=False, activate=False):
+        """audiobook for export"""
+
+        if changeWidget:
+            selected_book = self.selectedItems()[0].text(0)
+            if selected_book.lower().endswith(".mp3"):
+                selected_book =  self.selectedItems()[0].parent().text(0)
+
+            currentExportState = AudioFileTools.readFromXml(xml_cache_root, selected_book, export = True)
+            self.exportStateWidget.setChecked(int(currentExportState[0]))
+            self.exportStateWidget.setStyleSheet("QCheckBox {color: " + currentExportState[2] + ";}")
+        else:
+            if activate:
+                self.exportStateWidget.setChecked(0)
+                self.exportStateWidget.setChecked(1)
+            else:
+                self.exportStateWidget.setChecked(1)
+                self.exportStateWidget.setChecked(0)
+
 
 class OptionMenu(QtGui.QDialog):
     """option menus"""
