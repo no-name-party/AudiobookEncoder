@@ -4,7 +4,7 @@ __author__ = "Dennis Oesterle"
 __copyright__ = "Copyright 2014, Dennis Oesterle"
 __license__ = "CC BY-NC-SA - Attribution-NonCommercial-ShareAlike"
 __appname__ = "Audiobook Encoder"
-__version__ = "0.923b"
+__version__ = "0.925b"
 __email__ = "dennis@no-name-party.de"
 
 #===============================================================================
