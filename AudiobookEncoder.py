@@ -259,9 +259,21 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
                 text_colors = AudioFileTools.readFromXml(xml_cache_root, selected_book, export = True)[1:]
                 self.exportState.setStyleSheet("QCheckBox {color: " + text_colors[1] + ";}")
 
-                #change text color
+                # change text color of treewidget item
                 each_item.setTextColor(0, QtGui.QColor(text_colors[0]))
                 each_item.setTextColor(1, QtGui.QColor(text_colors[0]))
+
+                # change highlight color in treewidget
+                if text_colors[0] == "red":
+                    highlight_color = QtCore.Qt.red
+                else:
+                    highlight_color = QtGui.QColor(56, 117, 215,)
+
+                color_pallet = self.book_list.palette()
+                color_pallet.setColor(QtGui.QPalette.Highlight, highlight_color)
+                self.book_list.setPalette(color_pallet)
+
+                self.book_list.countActivatedAudiobooks()
 
     def openBrowser(self, page):
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(page))
@@ -529,6 +541,7 @@ class TreeWidget(QtGui.QTreeWidget):
             text_color = AudioFileTools.readFromXml(xml_cache_root, item_titel, export = True)
             self.item.setTextColor(0, QtGui.QColor(text_color[1]))
             self.item.setTextColor(1, QtGui.QColor(text_color[1]))
+            self.countActivatedAudiobooks()
 
             self.setCurrentItem(self.item)
             self.item_list_helper.hide()
@@ -539,9 +552,11 @@ class TreeWidget(QtGui.QTreeWidget):
             root_item = self.invisibleRootItem()
             root_item.removeChild(self.item)
 
-    def readAtStartFromXml(self):
+            self.countActivatedAudiobooks()
 
+    def readAtStartFromXml(self):
         list_of_all_audiobooks = AudioFileTools.readFromXml(xml_cache_root, None, all_audiobooks = True)
+        self.countActivatedAudiobooks(list_of_all_audiobooks)
 
         for each_book in list_of_all_audiobooks:
             self.addNewItems(draggedItems = False, audiobook_name = each_book)
@@ -563,6 +578,35 @@ class TreeWidget(QtGui.QTreeWidget):
                 #write to xml
                 changed_book_name = AudioFileTools.saveToXml(selected_book, xml_cache_root, _cache_dir, new_audiobook_name = new_audiobook_name)
                 selected_item.setText(0, changed_book_name)
+
+    def activateAudiobook(self, changeWidget=False, activate=False):
+        """change action: activate audiobook for export"""
+
+        if changeWidget:
+            selected_book = self.selectedItems()[0].text(0)
+            if selected_book.lower().endswith(".mp3"):
+                selected_book =  self.selectedItems()[0].parent().text(0)
+
+            currentExportState = AudioFileTools.readFromXml(xml_cache_root, selected_book, export = True)
+            self.exportStateWidget.setChecked(int(currentExportState[0]))
+            self.exportStateWidget.setStyleSheet("QCheckBox {color: " + currentExportState[2] + ";}")
+        else:
+            if activate:
+                self.exportStateWidget.setChecked(0)
+                self.exportStateWidget.setChecked(1)
+            else:
+                self.exportStateWidget.setChecked(1)
+                self.exportStateWidget.setChecked(0)
+
+    def countActivatedAudiobooks(self, audiobooks = False):
+        """counts active audiobooks"""
+
+        if not audiobooks:
+            audiobooks = AudioFileTools.readFromXml(xml_cache_root, None, all_audiobooks = True)
+
+        count_books = len(audiobooks)
+        count_active_books = len([each_b for each_b in audiobooks if int(AudioFileTools.readFromXml(xml_cache_root, each_b, export = True)[0])])
+        self.setHeaderLabels(["Audiobook ({0}/{1}) ".format(count_active_books, count_books), "Duration"])
 
     def keyPressEvent(self, event):
 
@@ -633,14 +677,14 @@ class TreeWidget(QtGui.QTreeWidget):
             item_name = self.selectedItems()[-1].text(0)
             self.menu = QtGui.QMenu(self)
 
-            actions = [["Open in Finder", self.openFolder], ["Play File", self.playFile], ["Activate", lambda: self.activateAudiobook(activate=True)], ["Deactivate", self.activateAudiobook], ["Check Files", ], ["Delete", self.deleteFiles]]
+            actions = [["Open in Finder", self.openFolder], ["Play File", self.playFile], ["Activate", lambda: self.activateAudiobook(activate=True)], ["Deactivate", self.activateAudiobook], ["Delete", self.deleteFiles]]
 
             if int(AudioFileTools.readOptionsXml(xml_options_root, "playfile")):
                 actions[1][0] = "Stop File"
             if not item_name.lower().endswith(".mp3"):
                 del actions[0:2]
             if item_name.lower().endswith(".mp3"):
-                del actions[2:5]
+                del actions[2:4]
 
             for each_action in actions:
                 action = QtGui.QAction(each_action[0], self)
@@ -701,7 +745,16 @@ class TreeWidget(QtGui.QTreeWidget):
                 audiobook_name = each_item.parent().text(0)
                 item_name =  item_name.split("    ")[1]
                 AudioFileTools.deleteFile(audiobook_name, item_name, xml_cache_root, _cache_dir)
+
+                # get the new total duration of audiobook
+                for each_book in xml_cache_root.getchildren():
+                    if audiobook_name == each_book.getchildren()[0].text:
+                        new_duration = AudioFileTools.getTotalDuration(each_book.getchildren()[5], each_book.getchildren()[8], xml_cache_root, _cache_dir)
+                        each_item.parent().setText(1, new_duration)
+
                 (each_item.parent() or root_item).removeChild(each_item)
+
+        self.countActivatedAudiobooks()
 
     def playFile(self):
         """play/stop file"""
@@ -730,25 +783,6 @@ class TreeWidget(QtGui.QTreeWidget):
                         except OSError:
                             process = subprocess.Popen(afplayCMD, stdout = subprocess.PIPE, stderr = subprocess.STDOUT, preexec_fn = os.setsid)
                             AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, process.pid, "playfile")
-
-    def activateAudiobook(self, changeWidget=False, activate=False):
-        """audiobook for export"""
-
-        if changeWidget:
-            selected_book = self.selectedItems()[0].text(0)
-            if selected_book.lower().endswith(".mp3"):
-                selected_book =  self.selectedItems()[0].parent().text(0)
-
-            currentExportState = AudioFileTools.readFromXml(xml_cache_root, selected_book, export = True)
-            self.exportStateWidget.setChecked(int(currentExportState[0]))
-            self.exportStateWidget.setStyleSheet("QCheckBox {color: " + currentExportState[2] + ";}")
-        else:
-            if activate:
-                self.exportStateWidget.setChecked(0)
-                self.exportStateWidget.setChecked(1)
-            else:
-                self.exportStateWidget.setChecked(1)
-                self.exportStateWidget.setChecked(0)
 
 
 class OptionMenu(QtGui.QDialog):

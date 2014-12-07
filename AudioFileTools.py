@@ -53,7 +53,7 @@ def getFileDuration(path_to_audio):
     stdout, stderr = process.communicate()
 
     # search by index for the seconds of file
-    file_sec =  round(float(stdout[(stdout.index("----") + 4):(stdout.index(" sec"))]))
+    file_sec =  round(float(stdout[(stdout.index("----") + 4):(stdout.index(" sec, "))]))
     duration = str(datetime.timedelta(seconds = file_sec))
 
     if len(duration.split(":")[0]) == 1:
@@ -95,7 +95,6 @@ def getTotalDuration(new_xml_book, audio_files_xml, xml_cache_root, _cache_dir):
         m = audiobook_duration.split(", ")[1].split(":")[1]
         s = audiobook_duration.split(", ")[1].split(":")[2]
         audiobook_duration = "{0}:{1}:{2}" .format(new_hours, m, s)
-    
     # save to xml
     new_xml_book.text = audiobook_duration
     ET.ElementTree(xml_cache_root).write(_cache_dir, encoding = "utf-8", xml_declaration = True, method = "xml")
@@ -129,22 +128,6 @@ def checkFiles(xml_cache_root):
         removed_files = False
 
     return removed_files
-
-def checkMp3Errors(xml_cache_root):
-    def checkFile(eachFile):
-        if eachFile.lower().endswith("mp3"):
-            #print eachFile
-            ffmpegCmd = ["ffmpeg", "-v", "error", "-i", eachFile, "-f", "null", "-"]
-
-            process = subprocess.Popen(ffmpegCmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            stdout, stderr = process.communicate()
-            if stdout:
-                print "\nError : ", eachFile
-
-    pool = Pool(7)
-    pool.map(checkFile, allFiles)
-    pool.close()
-    pool.join()
 
 def checkCover(xml_cache_root, cover):
     """check if cover is available"""
