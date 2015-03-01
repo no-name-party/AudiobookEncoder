@@ -534,21 +534,16 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir, exportUi):
         # create parts
         for n, each in enumerate(a_files):
             # convert all files to one large string
-            if len(each) >= 2:
-                a_files_str = each
-                parts = [1,1]
+            a_files_str = each
 
-                if a_parts >= 2:
-                    # adding Part to filename when exporting two files
-                    # get tracknumbers
-                    parts = [n + 1, a_parts]
-                    final_name = a_dest + a_name + " Part " + str(parts[0]) + ".m4b"
-                else:
-                    final_name = a_dest + a_name + ".m4b"
+            if a_parts >= 2:
+                # adding Part to filename when exporting two files
+                # get tracknumbers
+                parts = [n + 1, a_parts]
+                final_name = a_dest + a_name + " Part " + str(parts[0]) + ".m4b"
             else:
                 # for single files
-                a_files_str = each
-                parts = [1,1]
+                parts = [1, 1]
                 final_name = a_dest + a_name + ".m4b"
 
             print parts, final_name, a_files_str
@@ -557,15 +552,16 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir, exportUi):
             # "-b" = bitrate in KBps
             # "-r" = sample rate : 8000, 11025, 12000, 16000, 22050, 24000, 32000, (44100), 48000
             # "-c" = audio channels : 1/(2)
+            # "-E" = each file chapter: "%t" title, "%N" number
             abbinder = _script_dir + "/abbinder"
-            abbinder_cmd = [abbinder, "-sv", "-b", ab_quality, "-r", ar_quality, "-c", "2", "-o", final_name] + a_files_str
+            abbinder_cmd = [abbinder, "-sv", "-b", ab_quality, "-r", ar_quality, "-c", "2", "-E", "%N", "-o", final_name] + a_files_str
             process = subprocess.Popen(abbinder_cmd, stdout = subprocess.PIPE, stderr = subprocess.STDOUT)
             stdout, stderr = process.communicate()
 
             postExportAction(xml_cache_root, xml_options_root, _script_dir, a_name, final_name, parts)
 
-            if not parts == [1, 2]:
-                # check if the book has more parts and finnish it before reenable the gui
+            if parts == [parts[1], parts[1]]:
+                # check if the book has more parts and finnish it before renable the gui
 
                 # progressbar
                 cur_value = exportUi.progressbar.value()
