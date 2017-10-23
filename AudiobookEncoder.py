@@ -4,10 +4,20 @@ __author__ = "Dennis Oesterle"
 __copyright__ = "Copyright 2014, Dennis Oesterle"
 __license__ = "CC BY-NC-SA - Attribution-NonCommercial-ShareAlike"
 __appname__ = "Audiobook Encoder"
-__version__ = "0.925b"
+__version__ = "0.926b"
 __email__ = "dennis@no-name-party.de"
 
 #===============================================================================
+
+# TODO
+# Python 3.6
+# Pyside 2 or PyQt5
+# unconverted cover to trash
+# delete audiobook -> move files to trash
+# title and album name from meta data
+# most rescent album names in list
+# fix sorting files
+# cleanup
 
 #IMPMORTS
 import sip
