@@ -1,7 +1,5 @@
-# -*- coding: utf8 -*-
-
 __author__ = "Dennis Oesterle"
-__copyright__ = "Copyright 2014, Dennis Oesterle"
+__copyright__ = "Copyright 2017, Dennis Oesterle"
 __license__ = "CC BY-NC-SA - Attribution-NonCommercial-ShareAlike"
 __appname__ = "Audiobook Encoder"
 __version__ = "0.926b"
@@ -9,20 +7,8 @@ __email__ = "dennis@no-name-party.de"
 
 #===============================================================================
 
-# TODO
-# Python 3.6
-# Pyside 2 or PyQt5
-# unconverted cover to trash
-# delete audiobook -> move files to trash
-# title and album name from meta data
-# most rescent album names in list
-# fix sorting files
-# cleanup
-
 #IMPMORTS
-import sip
-sip.setapi('QString', 2) # change pyqt4 api to version 2 to avoid qstrings
-from PyQt4 import QtGui, QtCore
+from PySide2 import QtGui, QtCore, QtWidgets
 import sys
 import xml.etree.ElementTree as ET
 import AudioFileTools
@@ -32,22 +18,20 @@ import signal
 import subprocess
 import multiprocessing
 from datetime import date
-reload(sys)
-sys.setdefaultencoding("UTF8")
 
 #GUI============================================================================
 
-class AudiobookEncoderMainWindow(QtGui.QMainWindow):
+class AudiobookEncoderMainWindow(QtWidgets.QMainWindow):
     """Create the main window"""
 
     def __init__(self):
-        QtGui.QMainWindow.__init__(self)
+        QtWidgets.QMainWindow.__init__(self)
 
         self.setWindowTitle("{0} - {1}" .format(__appname__, __version__))
         self.resize(1200, 720)
         self.setFixedSize(1200, 700)
         # move to center of screen 
-        self.move(QtGui.QApplication.desktop().screen().rect().center() - self.rect().center())
+        self.move(QtWidgets.QApplication.desktop().screen().rect().center() - self.rect().center())
 
         self.setWindowIcon(QtGui.QIcon(_script_dir + "/icons/icon32.png"))
 
@@ -68,27 +52,26 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
         pref_m.triggered.connect(lambda: OptionMenu(self, [self.Header2Font, self.Header3Font]))
 
         doc_m = main_menu.addAction("Website")
-        doc_m.setMenuRole(QtGui.QAction.ApplicationSpecificRole) # this adds it to main app menu
+        doc_m.setMenuRole(QtWidgets.QAction.ApplicationSpecificRole) # this adds it to main app menu
         doc_m.triggered.connect(lambda: self.openBrowser("http://no-name-party.de/audiobook-encoder/"))
 
         doc_m = main_menu.addAction("Help")
-        doc_m.setMenuRole(QtGui.QAction.ApplicationSpecificRole) # this adds it to main app menu
+        doc_m.setMenuRole(QtWidgets.QAction.ApplicationSpecificRole) # this adds it to main app menu
         doc_m.triggered.connect(lambda: self.openBrowser("http://no-name-party.de/audiobook-encoder/"))
 
         # tag fields
         self.book_name = TextBox(self, font=self.Header3Font, name="Title", position=[15, 15, 310, 60], lineEditSize=[300, 25])
 
         self.author = TextBox(self, font=self.Header3Font, name="Author", position=[15, 70, 270, 60], lineEditSize=[265, 25])
-        #self.author.lineEdit.textEdited.connect(lambda: AudioFileTools.saveToXml(self.book_name.lineEdit.text(), xml_cache_root, _cache_dir, author = self.author.lineEdit.text()))
         self.author.lineEdit.textEdited.connect(lambda: AudioFileTools.saveToXml(self.book_name.lineEdit.text(), xml_cache_root, _cache_dir, author = [True, self.author.lineEdit.text()]))
 
         # author preset button
-        self.apreset = QtGui.QPushButton("", self)
+        self.apreset = QtWidgets.QPushButton("", self)
         self.apreset.setGeometry(290, 93, 25, 25)
         self.apreset.setIcon(QtGui.QIcon(_script_dir + "/icons/clip.png"))
         self.apreset.setToolTip("Save or set an author preset.")
         # preset pop up menu
-        self.popMenu = QtGui.QMenu()
+        self.popMenu = QtWidgets.QMenu()
         self.apreset.setMenu(self.popMenu)
         self.popMenu.aboutToShow.connect(self.createMenuPreset)
         self.apreset.setStyleSheet("QPushButton::menu-indicator { image: none; }")
@@ -105,7 +88,7 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
         # export field
         self.export_path = TextBox(self, font = self.Header3Font, name = "Export Destination", position = [15, 555, 270, 60], lineEditSize = [265, 25])
 
-        self.add_path = QtGui.QPushButton("", self)
+        self.add_path = QtWidgets.QPushButton("", self)
         self.add_path.setGeometry(290, 578, 25, 25)
         self.add_path.setIcon(QtGui.QIcon(_script_dir + "/icons/folder.png"))
         self.add_path.setToolTip("Change export path.")
@@ -118,14 +101,14 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
         self.export_path.lineEdit.textEdited.connect(lambda: self.addPath(file_dialog = False))
 
         # build options quality
-        self.build_options = QtGui.QComboBox(self)
+        self.build_options = QtWidgets.QComboBox(self)
         self.build_options.setGeometry(12, 615, 230, 25)
         self.build_options.addItems(qualityPresets)
         self.build_options.currentIndexChanged.connect(lambda: AudioFileTools.saveToXml(self.book_name.lineEdit.text(), xml_cache_root, _cache_dir, qualityPresets, quality = [True, self.build_options.currentIndex()]))
         self.build_options.setToolTip("Change quality of an audiobook.")
 
         # export yes or no button
-        self.exportState = QtGui.QCheckBox("Activate", self)
+        self.exportState = QtWidgets.QCheckBox("Activate", self)
         self.exportState.setGeometry(250, 615, 150, 25)
         self.exportState.setFont(self.Header3Font)
         self.exportState.setStyleSheet("QCheckBox {color: grey;}")
@@ -141,12 +124,12 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
         self.exportState.stateChanged.connect(self.activateExport)
 
         #bt
-        self.options = QtGui.QPushButton("Options", self)
+        self.options = QtWidgets.QPushButton("Options", self)
         self.options.setGeometry(10, 645, 160, 35)
         self.options.setToolTip("...")
         self.options.clicked.connect(lambda: OptionMenu(self, [self.Header2Font, self.Header3Font]))
 
-        self.export_audio = QtGui.QPushButton("Export", self)
+        self.export_audio = QtWidgets.QPushButton("Export", self)
         self.export_audio.setGeometry(165, 645, 160, 35)
         self.export_audio.setToolTip("Batch export all audiobooks.")
         self.export_audio.clicked.connect(self.onExport)
@@ -165,7 +148,7 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
             else:
                 open_path = AudioFileTools.readOptionsXml(xml_options_root, "expdest")
 
-            self.filepath = QtGui.QFileDialog.getExistingDirectory(self, 'Add Path', open_path)
+            self.filepath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Add Path', open_path)
 
             if self.filepath:
                 self.export_path.lineEdit.setText(self.filepath + "/")
@@ -222,7 +205,7 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
     def errorLog(self, error_msg = False, mesg = False, error_log = True):
         """error log for the user"""
 
-        self.mbox = QtGui.QMessageBox()
+        self.mbox = QtWidgets.QMessageBox()
 
         if not error_log:
             if error_msg[0] == 1:
@@ -288,7 +271,7 @@ class AudiobookEncoderMainWindow(QtGui.QMainWindow):
     def openBrowser(self, page):
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(page))
 
-class CoverWidget(QtGui.QLabel):
+class CoverWidget(QtWidgets.QLabel):
     """drag and drop zone for covers"""
 
     def __init__(self, parent, font, widget):
@@ -307,7 +290,7 @@ class CoverWidget(QtGui.QLabel):
 
         self.titleWidget = widget
 
-        self.warning = QtGui.QLabel("", parent)
+        self.warning = QtWidgets.QLabel("", parent)
         self.warning.setGeometry(300, 510, 50, 50)
         self.warning.setFont(font)
         self.warning.setStyleSheet("QLabel {color: crimson;}")
@@ -330,7 +313,7 @@ class CoverWidget(QtGui.QLabel):
                     cover_path = AudioFileTools.addCover(url.path(), save_xml = False)
 
                 self.cover.load(cover_path)
-                self.setPixmap(self.cover.scaled(280, 280, aspectRatioMode = QtCore.Qt.KeepAspectRatio))
+                self.setPixmap(self.cover.scaledToHeight(280))
 
                 self.imageWarning(image_ratio=AudioFileTools.resizeCover(cover_path, info=True))
 
@@ -343,9 +326,9 @@ class CoverWidget(QtGui.QLabel):
         self.deleteCoverImage()
 
     def contextMenuEvent(self, event):
-        self.menu = QtGui.QMenu(self)
+        self.menu = QtWidgets.QMenu(self)
 
-        action_resize = QtGui.QAction("Scale", self)
+        action_resize = QtWidgets.QAction("Scale", self)
         self.menu.addAction(action_resize)
 
         if self.titleWidget.lineEdit.text():
@@ -354,7 +337,7 @@ class CoverWidget(QtGui.QLabel):
             if cover_path:
                 action_resize.triggered.connect(lambda: self.resizeReplaceCover(cover_path))
 
-        action_del = QtGui.QAction("Delete", self)
+        action_del = QtWidgets.QAction("Delete", self)
         self.menu.addAction(action_del)
         action_del.triggered.connect(self.deleteCoverImage)
 
@@ -366,9 +349,8 @@ class CoverWidget(QtGui.QLabel):
         resize_completed = AudioFileTools.resizeCover(cover_path, scale=True)
         if resize_completed:
             self.cover.load(cover_path)
-            self.setPixmap(self.cover.scaled(280, 280, aspectRatioMode = QtCore.Qt.KeepAspectRatio))
+            self.setPixmap(self.cover.scaledToHeight(280))
             self.imageWarning(image_ratio=AudioFileTools.resizeCover(cover_path, info=True))
-
 
     def imageWarning(self, image_ratio):
         """check if the image ratio is 1"""
@@ -378,7 +360,7 @@ class CoverWidget(QtGui.QLabel):
             self.warning.setToolTip("Size: <br>" + str(image_ratio[1]) + " * " + str(image_ratio[2]))
             self.warning.show()
         else:
-             self.warning.hide()
+            self.warning.hide()
 
     def deleteCoverImage(self):
         audiobook_name = self.titleWidget.lineEdit.text()
@@ -388,22 +370,22 @@ class CoverWidget(QtGui.QLabel):
 
 
 # QTreeWidget
-class TreeWidget(QtGui.QTreeWidget):
+class TreeWidget(QtWidgets.QTreeWidget):
     """list for all loaded audiobooks"""
 
     def __init__(self, parent, font, widgets):
         super(TreeWidget, self).__init__(parent)
         self.setAcceptDrops(True)
-        self.setDragDropMode(QtGui.QAbstractItemView.InternalMove)
+        self.setDragDropMode(QtWidgets.QAbstractItemView.InternalMove)
         self.setGeometry(360, 37, 825, 635)
         self.setHeaderLabels(["Audiobook", "Duration"])
         self.header().resizeSection(0, 720)
         self.header().setStretchLastSection(True)
         self.setHeaderHidden(False)
-        self.setSelectionMode(QtGui.QAbstractItemView.ExtendedSelection)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         # this text is hidden, when the first book is dropped
-        self.item_list_helper = QtGui.QLabel("Drag and Drop <br> Audiobooks", self)
+        self.item_list_helper = QtWidgets.QLabel("Drag and Drop <br> Audiobooks", self)
         self.item_list_helper.setGeometry(350, 290, 150, 45)
         self.item_list_helper.setFont(font)
         self.item_list_helper.setAlignment(QtCore.Qt.AlignCenter)
@@ -448,13 +430,14 @@ class TreeWidget(QtGui.QTreeWidget):
                 if AudioFileTools.readFromXml(xml_cache_root, selected_book, cover = True):
                     cover_path = AudioFileTools.readFromXml(xml_cache_root, selected_book, cover = True)
 
-                    if not AudioFileTools.checkCover(xml_cache_root, cover_path):
+                    if not AudioFileTools.coverExists(xml_cache_root, cover_path):
                         self.coverWidget.setText("Cover Artwork <br> not found")
                         self.coverWidget.warning.hide()
                     else:
                         self.coverWidget.cover.load(cover_path)
-                        self.coverWidget.setPixmap(self.coverWidget.cover.scaled(280, 280, aspectRatioMode = QtCore.Qt.KeepAspectRatio))
-                        self.coverWidget.imageWarning(image_ratio=AudioFileTools.resizeCover(cover_path, info=True))
+                        self.coverWidget.setPixmap(self.coverWidget.cover.scaledToHeight(280))
+
+                        self.coverWidget.imageWarning(image_ratio=AudioFileTools.resizeCover(cover_path, info = True))
                 else:
                     self.coverWidget.setText("Drag and Drop <br> Cover Artwork")
                     self.coverWidget.warning.hide()
@@ -505,7 +488,7 @@ class TreeWidget(QtGui.QTreeWidget):
                 if file_info:
                     AudioFileTools.saveDragXml(file_info, files_xml, xml_cache_root, _cache_dir)
                 else:
-                   pass
+                    pass
 
             # get the total time
             AudioFileTools.getTotalDuration(new_xml_book.getchildren()[5], files_xml, xml_cache_root, _cache_dir)
@@ -523,7 +506,7 @@ class TreeWidget(QtGui.QTreeWidget):
 
         item_length = AudioFileTools.readFromXml(xml_cache_root, item_titel, length = True)
 
-        self.item = QtGui.QTreeWidgetItem()
+        self.item = QtWidgets.QTreeWidgetItem()
         self.item.setText(0, item_titel)
         self.item.setText(1, item_length)
         self.addTopLevelItem(self.item)
@@ -538,7 +521,7 @@ class TreeWidget(QtGui.QTreeWidget):
                 file_title = each_file[0] + "    {0}".format(each_file[2])
                 file_length = each_file[1]
 
-                sub_item = QtGui.QTreeWidgetItem(self.item, [file_title, file_length])
+                sub_item = QtWidgets.QTreeWidgetItem(self.item, [file_title, file_length])
                 # disable drag and drop etc
                 sub_item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable) # | QtCore.Qt.ItemIsDragEnabled)
                 itemTip = "Double click to open directory.\nPress Space key to play / pause track.\n" + each_file[2]
@@ -557,7 +540,7 @@ class TreeWidget(QtGui.QTreeWidget):
             self.item_list_helper.hide()
 
         else:
-            QtGui.QMessageBox.warning(self, "Message", "Please drop a valid file format! (mp3)", QtGui.QMessageBox.Ok)
+            QtWidgets.QMessageBox.warning(self, "Message", "Please drop a valid file format! (mp3)", QtWidgets.QMessageBox.Ok)
             AudioFileTools.deleteAudiobook(item_titel, xml_cache_root, _cache_dir)
             root_item = self.invisibleRootItem()
             root_item.removeChild(self.item)
@@ -685,7 +668,7 @@ class TreeWidget(QtGui.QTreeWidget):
 
         if self.selectedItems():
             item_name = self.selectedItems()[-1].text(0)
-            self.menu = QtGui.QMenu(self)
+            self.menu = QtWidgets.QMenu(self)
 
             actions = [["Open in Finder", self.openFolder], ["Play File", self.playFile], ["Activate", lambda: self.activateAudiobook(activate=True)], ["Deactivate", self.activateAudiobook], ["Delete", self.deleteFiles]]
 
@@ -697,7 +680,7 @@ class TreeWidget(QtGui.QTreeWidget):
                 del actions[2:4]
 
             for each_action in actions:
-                action = QtGui.QAction(each_action[0], self)
+                action = QtWidgets.QAction(each_action[0], self)
                 self.menu.addAction(action)
                 try:
                     action.triggered.connect(each_action[1])
@@ -721,7 +704,7 @@ class TreeWidget(QtGui.QTreeWidget):
             if os.path.exists(file_path):
                 subprocess.Popen(["open", file_path])
             else:
-                folder_err = LogUi(self, label = "Folder Error!", msg = "Can't find folder:\n" + file_path)
+                _folder_err = LogUi(self, label = "Folder Error!", msg = "Can't find folder:\n" + file_path)
 
     def deleteFiles(self):
         """delete files"""
@@ -795,19 +778,19 @@ class TreeWidget(QtGui.QTreeWidget):
                             AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, process.pid, "playfile")
 
 
-class OptionMenu(QtGui.QDialog):
+class OptionMenu(QtWidgets.QDialog):
     """option menus"""
 
     def __init__(self, parent, font = None):
         super(OptionMenu, self).__init__(parent)
         self.resize(440, 620)
 
-        self.optionHeader = QtGui.QLabel("Options", self)
+        self.optionHeader = QtWidgets.QLabel("Options", self)
         self.optionHeader.setGeometry(20, 20, 200, 20)
         self.optionHeader.setFont(font[0])
         self.optionHeader.setStyleSheet("QLabel {color: grey;}")
 
-        self.itunesCheck = QtGui.QCheckBox("Add to iTunes Library", self)
+        self.itunesCheck = QtWidgets.QCheckBox("Add to iTunes Library", self)
         self.itunesCheck.move(20, 50)
         self.itunesCheck.setFont(font[1])
         self.itunesCheck.setStyleSheet("QCheckBox {color: grey;}")
@@ -815,14 +798,14 @@ class OptionMenu(QtGui.QDialog):
         self.itunesCheck.setChecked(int(AudioFileTools.readOptionsXml(xml_options_root, "itunes")))
         self.itunesCheck.stateChanged.connect(lambda: AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, int(self.itunesCheck.isChecked()), "itunes"))
 
-        self.shotdownPc = QtGui.QCheckBox("Shutdown computer after export", self)
+        self.shotdownPc = QtWidgets.QCheckBox("Shutdown computer after export", self)
         self.shotdownPc.move(20, 80)
         self.shotdownPc.setFont(font[1])
         self.shotdownPc.setStyleSheet("QCheckBox {color: grey;}")
         self.shotdownPc.setChecked(int(AudioFileTools.readOptionsXml(xml_options_root, "shutdown")))
         self.shotdownPc.stateChanged.connect(lambda: AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, int(self.shotdownPc.isChecked()), "shutdown" ))
 
-        self.expandBook = QtGui.QCheckBox("Expand Audiobook", self)
+        self.expandBook = QtWidgets.QCheckBox("Expand Audiobook", self)
         self.expandBook.move(20, 110)
         self.expandBook.setFont(font[1])
         self.expandBook.setStyleSheet("QCheckBox {color: grey;}")
@@ -830,10 +813,10 @@ class OptionMenu(QtGui.QDialog):
         self.expandBook.setChecked(int(AudioFileTools.readOptionsXml(xml_options_root, "expand")))
         self.expandBook.stateChanged.connect(lambda: AudioFileTools.saveOptionsXml(xml_options_root, _options_dir, int(self.expandBook.isChecked()), "expand" ))
 
-        self.taskbox = QtGui.QSpinBox(self)
+        self.taskbox = QtWidgets.QSpinBox(self)
         self.taskbox.setRange(1, 8)
         self.taskbox.move(20, 140)
-        self.tbox_label = QtGui.QLabel("Task Size <small>(max. {0} recommended on your system)</small>".format(multiprocessing.cpu_count()), self)
+        self.tbox_label = QtWidgets.QLabel("Task Size <small>(max. {0} recommended on your system)</small>".format(multiprocessing.cpu_count()), self)
         self.tbox_label.setGeometry(72, 142, 250, 20)
         self.tbox_label.setFont(font[1])
         self.tbox_label.setStyleSheet("QLabel {color: grey;}")
@@ -842,7 +825,7 @@ class OptionMenu(QtGui.QDialog):
         self.taskbox.setToolTip("Increase the task size to export more audiobooks parallel. This may slow down your system.")
 
         self.default_path = TextBox(self, font = font[1], name = "Default Export Destination", position = [20, 175, 270, 60], lineEditSize = [265, 25])
-        self.add_path = QtGui.QPushButton("", self)
+        self.add_path = QtWidgets.QPushButton("", self)
         self.add_path.setGeometry(295, 198, 25, 25)
         self.add_path.setIcon(QtGui.QIcon(_script_dir + "/icons/folder.png"))
         self.add_path.setToolTip("Change default export path.")
@@ -851,16 +834,16 @@ class OptionMenu(QtGui.QDialog):
         self.default_path.lineEdit.textEdited.connect(lambda: self.addPath(file_dialog = False))
 
         # author presets
-        self.authorHeader = QtGui.QLabel("Delete Author Presets", self)
+        self.authorHeader = QtWidgets.QLabel("Delete Author Presets", self)
         self.authorHeader.setGeometry(20, 240, 200, 20)
         self.authorHeader.setFont(font[1])
         self.authorHeader.setStyleSheet("QLabel {color: grey;}")
 
-        self.authorList = QtGui.QListWidget(self)
+        self.authorList = QtWidgets.QListWidget(self)
         self.authorList.setGeometry(21, 265, 400, 330)
 
         for each_preset in sorted(AudioFileTools.readPresetAuthor(xml_options_root, _options_dir, menu = True)):
-            self.preset_item = QtGui.QListWidgetItem(each_preset)
+            self.preset_item = QtWidgets.QListWidgetItem(each_preset)
             self.preset_item.setToolTip("Hit Backspace to delete a preset.")
             self.authorList.addItem(self.preset_item)
 
@@ -874,7 +857,7 @@ class OptionMenu(QtGui.QDialog):
             else:
                 open_path = _desktop_folder
 
-            self.filepath = QtGui.QFileDialog.getExistingDirectory(self, 'Add Path', open_path)
+            self.filepath = QtWidgets.QFileDialog.getExistingDirectory(self, 'Add Path', open_path)
 
             if self.filepath:
                 self.default_path.lineEdit.setText(self.filepath + "/")
@@ -893,68 +876,68 @@ class OptionMenu(QtGui.QDialog):
         elif event.key() == QtCore.Qt.Key_Escape:
             self.close()
 
-class AboutMenu(QtGui.QDialog):
+class AboutMenu(QtWidgets.QDialog):
     """about menu"""
 
     def __init__(self, parent):
         super(AboutMenu, self).__init__(parent)
         self.resize(440, 400)
 
-        self.logo = QtGui.QLabel(self)
+        self.logo = QtWidgets.QLabel(self)
         self.logo.setPixmap(QtGui.QPixmap(_script_dir + "/icons/icon324.png"))
         self.logo.setAlignment(QtCore.Qt.AlignCenter)
 
-        self.AboutHeader = QtGui.QLabel("<center>Audiobook <br>Encoder</center>", self)
+        self.AboutHeader = QtWidgets.QLabel("<center>Audiobook <br>Encoder</center>", self)
         self.AboutHeader.setFont(QtGui.QFont("Arial", 40, QtGui.QFont.Bold))
         self.AboutHeader.setStyleSheet("QLabel {color: grey;}")
 
-        self.version = QtGui.QLabel("<center>Version {0}</center>".format(__version__), self)
+        self.version = QtWidgets.QLabel("<center>Version {0}</center>".format(__version__), self)
         self.version.setFont(QtGui.QFont("Arial", 13, QtGui.QFont.Bold))
         self.version.setStyleSheet("QLabel {color: grey;}")
 
-        self.copyright = QtGui.QLabel("<center>Copyright 2013-{0}<br><a href=\"mailto:{1}\"><span style=\"color:grey;\">{2}</span></a></center>".format(date.today().year, __email__, __author__), self)
+        self.copyright = QtWidgets.QLabel("<center>Copyright 2013-{0}<br><a href=\"mailto:{1}\"><span style=\"color:grey;\">{2}</span></a></center>".format(date.today().year, __email__, __author__), self)
         self.copyright.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.copyright.setStyleSheet("QLabel {color: grey;}")
         self.copyright.linkActivated.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("mailto:" + __email__)))
 
-        self.license = QtGui.QLabel("<center><b>License</b><br>{0}<br>{1}</center>".format(__license__.split(" - ")[0], __license__.split(" - ")[1]), self)
+        self.license = QtWidgets.QLabel("<center><b>License</b><br>{0}<br>{1}</center>".format(__license__.split(" - ")[0], __license__.split(" - ")[1]), self)
         self.license.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.license.setStyleSheet("QLabel {color: grey;}")
 
         # additional creitds
-        self.addCreditsLabel = QtGui.QLabel("<center><b>Additional Credits</b>", self)
+        self.addCreditsLabel = QtWidgets.QLabel("<center><b>Additional Credits</b>", self)
         self.addCreditsLabel.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.addCreditsLabel.setStyleSheet("QLabel {color: grey;}")
 
-        self.sub_python = QtGui.QLabel("<center><a href=\"http://www.python.org/\"><span style=\"color:grey;\">Python</span></a></center>", self)
+        self.sub_python = QtWidgets.QLabel("<center><a href=\"http://www.python.org/\"><span style=\"color:grey;\">Python</span></a></center>", self)
         self.sub_python.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.sub_python.linkActivated.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://www.python.org/")))
 
-        self.sub_pyside = QtGui.QLabel("<center><a href=\"http://www.riverbankcomputing.co.uk/software/pyqt/download\"><span style=\"color:grey;\">PyQt4</span></a></center>", self)
+        self.sub_pyside = QtWidgets.QLabel("<center><a href=\"http://www.riverbankcomputing.co.uk/software/pyqt/download\"><span style=\"color:grey;\">PyQt4</span></a></center>", self)
         self.sub_pyside.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.sub_pyside.linkActivated.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://qt-project.org/wiki/PySide")))
 
-        self.sub_mutagen = QtGui.QLabel("<center><a href=\"http://code.google.com/p/mutagen/\"><span style=\"color:grey;\">Mutagen</span></a></center>", self)
+        self.sub_mutagen = QtWidgets.QLabel("<center><a href=\"http://code.google.com/p/mutagen/\"><span style=\"color:grey;\">Mutagen</span></a></center>", self)
         self.sub_mutagen.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.sub_mutagen.linkActivated.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://code.google.com/p/mutagen/")))
 
-        self.sub_pil = QtGui.QLabel("<center><a href=\"http://www.pythonware.com/products/pil/\"><span style=\"color:grey;\">PIL</span></a></center>", self)
+        self.sub_pil = QtWidgets.QLabel("<center><a href=\"http://www.pythonware.com/products/pil/\"><span style=\"color:grey;\">PIL</span></a></center>", self)
         self.sub_pil.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.sub_pil.linkActivated.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://www.pythonware.com/products/pil/")))
 
-        self.sub_qt_faststart = QtGui.QLabel("<center><a href=\"https://github.com/danielgtaylor/\"><span style=\"color:grey;\">qt-faststart</span></a></center>", self)
+        self.sub_qt_faststart = QtWidgets.QLabel("<center><a href=\"https://github.com/danielgtaylor/\"><span style=\"color:grey;\">qt-faststart</span></a></center>", self)
         self.sub_qt_faststart.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.sub_qt_faststart.linkActivated.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("https://github.com/danielgtaylor/qtfaststart")))
 
-        self.sub_abbinder = QtGui.QLabel("<center><a href=\"http://bluezbox.com/audiobookbinder/abbinder.html\"><span style=\"color:grey;\">abbinder</span></a></center>", self)
+        self.sub_abbinder = QtWidgets.QLabel("<center><a href=\"http://bluezbox.com/audiobookbinder/abbinder.html\"><span style=\"color:grey;\">abbinder</span></a></center>", self)
         self.sub_abbinder.setFont(QtGui.QFont("Arial", 12, QtGui.QFont.Light))
         self.sub_abbinder.linkActivated.connect(lambda: QtGui.QDesktopServices.openUrl(QtCore.QUrl("http://bluezbox.com/audiobookbinder/abbinder.html")))
 
         # layout
-        self.overAllLayout = QtGui.QFormLayout(self)
+        self.overAllLayout = QtWidgets.QFormLayout(self)
         self.overAllLayout.setVerticalSpacing(10)
 
-        self.additinalCreitdsLayout = QtGui.QFormLayout()
+        self.additinalCreitdsLayout = QtWidgets.QFormLayout()
         self.additinalCreitdsLayout.setVerticalSpacing(0)
 
         # adding widgets to layout
@@ -967,19 +950,19 @@ class AboutMenu(QtGui.QDialog):
 
         self.open()
 
-class LogUi(QtGui.QDialog):
+class LogUi(QtWidgets.QDialog):
     """Error logging window"""
 
     def __init__(self, parent, label = None, msg = None, counter_msg = False, fontSize = [15, 12], progress = False, close = True):
         super(LogUi, self).__init__(parent)
         self.resize(440, 200)
 
-        self.optionHeader = QtGui.QLabel(label, self)
+        self.optionHeader = QtWidgets.QLabel(label, self)
         self.optionHeader.setGeometry(20, 20, 200, 50)
         self.optionHeader.setFont(QtGui.QFont("Arial", fontSize[0], QtGui.QFont.Bold))
         self.optionHeader.setStyleSheet("QLabel {color: grey;}")
 
-        self.msg = QtGui.QLabel(msg, self)
+        self.msg = QtWidgets.QLabel(msg, self)
         self.msg.setGeometry(20, 50, 400, 50)
         self.msg.setFont(QtGui.QFont("Arial", fontSize[1], QtGui.QFont.Bold))
         self.msg.setStyleSheet("QLabel {color: grey;}")
@@ -988,14 +971,14 @@ class LogUi(QtGui.QDialog):
         self.want_to_close = close
 
         if progress:
-            self.progressbar = QtGui.QProgressBar(self)
+            self.progressbar = QtWidgets.QProgressBar(self)
             self.progressbar.setGeometry(20, 125, 400, 100)
             self.progressbar.setMinimum(1)
             self.progressbar.setMaximum(100)
 
         if counter_msg:
             # counter for export
-            self.counter = QtGui.QLabel(counter_msg, self)
+            self.counter = QtWidgets.QLabel(counter_msg, self)
             self.counter.setGeometry(210, 110, 100, 50)
             self.counter.setFont(QtGui.QFont("Arial", fontSize[1], QtGui.QFont.Bold))
             self.counter.setStyleSheet("QLabel {color: grey;}")
@@ -1011,13 +994,13 @@ class TextBox:
     """textbox with header"""
 
     def __init__(self, parent, font, name = "Name", position = [0, 0, 0, 0], lineEditSize = [0, 0], tip = ""):
-        self.combobox = QtGui.QWidget(parent)
+        self.combobox = QtWidgets.QWidget(parent)
         self.combobox.setGeometry(position[0], position[1], position[2], position[3])
-        self.label = QtGui.QLabel(name, self.combobox)
+        self.label = QtWidgets.QLabel(name, self.combobox)
         self.label.setGeometry(1, 1, 200, 20)
         self.label.setFont(font)
         self.label.setStyleSheet("QLabel {color: grey;}")
-        self.lineEdit = QtGui.QLineEdit(self.combobox)
+        self.lineEdit = QtWidgets.QLineEdit(self.combobox)
         self.lineEdit.setGeometry(1, 23, lineEditSize[0], lineEditSize[1])
         if tip:
             self.lineEdit.setToolTip(tip)
@@ -1031,7 +1014,6 @@ def globalVars():
     _script_dir = QtCore.QDir.currentPath()
     _cache_dir =  _script_dir + "/cache.xml"
     _options_dir = _script_dir + "/options.xml"
-
     external_dir = _home_dir + "/.audiobookEncoder"
 
     if not os.path.exists(external_dir):
@@ -1054,7 +1036,7 @@ def globalVars():
 
 def main():
     globalVars()
-    app = QtGui.QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     aEUi = AudiobookEncoderMainWindow()
     aEUi.show()
     sys.exit(app.exec_())
