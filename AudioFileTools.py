@@ -1,26 +1,18 @@
-# -*- coding: utf8 -*- 
-
 #IMPMORTS
-import sip
-sip.setapi('QString', 2)
-from PyQt4 import QtCore
+from PySide2 import QtCore
 import os
 import mutagen
-from mutagen.mp4 import MP4
-from mutagen.mp4 import MP4Cover
+from mutagen.mp4 import MP4, MP4Cover
 import datetime
 import subprocess
 import xml.etree.ElementTree as ET
-import Image
-import sys
+from PIL import Image
 import threading
 import math
 import time
 import random
 from multiprocessing.dummy import Pool
-from Foundation import NSAutoreleasePool
-reload(sys)
-sys.setdefaultencoding("UTF8")
+import shutil
 
 #file functions=================================================================
 
@@ -52,8 +44,8 @@ def getFileDuration(path_to_audio):
 
     afinfo = ["afinfo", "-b", str(path_to_audio)]
     process = subprocess.Popen(afinfo, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-    stdout, stderr = process.communicate()
-
+    stdout = str(process.communicate()[0], "utf-8")
+    
     # search by index for the seconds of file
     file_sec =  round(float(stdout[(stdout.index("----") + 4):(stdout.index(" sec, "))]))
     duration = str(datetime.timedelta(seconds = file_sec))
@@ -131,7 +123,7 @@ def checkFiles(xml_cache_root):
 
     return removed_files
 
-def checkCover(xml_cache_root, cover):
+def coverExists(xml_cache_root, cover):
     """check if cover is available"""
 
     if not os.path.exists(cover):
@@ -227,7 +219,7 @@ def readFromXml(xml_cache_root, audiobook_name = None, all_audiobooks = None, ti
                     list_of_files = []
                     
                     for each_file in files:
-                        list_of_files.append([unicode(each_file.getchildren()[0].text), unicode(each_file.getchildren()[1].text), unicode(each_file.getchildren()[2].text)])
+                        list_of_files.append([each_file.getchildren()[0].text, each_file.getchildren()[1].text, each_file.getchildren()[2].text])
                     
                     return list_of_files
 
@@ -314,30 +306,28 @@ def addCover(cover_url, xml_cache_root, _cache_dir, audiobook_name = None, save_
     """converts everything in png, rgb and write to xml"""
     
     droped_cover = Image.open(cover_url)
-
+    old_cover_url = False
     if not droped_cover.mode == "RGB":
         droped_cover.convert("RGB").save(cover_url)
         droped_cover = Image.open(cover_url)
-
+    
     w, h = droped_cover.size
-    size = [512, 512]
+    size = [1024, 1024]
     
     # create png file / qt supports only png
     if not cover_url.endswith("png"):
         new_filename =  "/" + os.path.splitext(os.path.basename(os.path.abspath(cover_url)))[0] + ".png"
         new_cover_path = os.path.dirname(os.path.abspath(cover_url)) + new_filename 
-        
-        # change size
-        if w or h > size:
-            droped_cover.thumbnail(size, Image.ANTIALIAS) #@UndefinedVariable
-        
-        droped_cover.save(new_cover_path)
-        cover_url = new_cover_path            
-    
+        old_cover_url = cover_url
+        cover_url = new_cover_path
+
     # change size     
     if w or h > size:
         droped_cover.thumbnail(size, Image.ANTIALIAS) #@UndefinedVariable
-        droped_cover.save(cover_url) 
+    
+    droped_cover.save(cover_url) 
+    if old_cover_url:
+        shutil.move(old_cover_url, QtCore.QDir.homePath() + "/.Trash")
     
     if audiobook_name:
         for each_book in xml_cache_root.getchildren():
@@ -391,7 +381,7 @@ def readOptionsXml(xml_options_root, name = False):
 
     for each_opt in xml_options_root.getchildren():
         if each_opt.tag == name:
-            return unicode(each_opt.text)
+            return each_opt.text
 
 def savePresetAuthor(xml_options_root, _options_dir, presets):
     """save preset author to xml"""
@@ -518,9 +508,6 @@ def exportAction(xml_cache_root, xml_options_root, _script_dir, exportUi):
     ls_books = preExportActions(xml_cache_root)
 
     def multiprocessExport(audiobook):
-        #for audiobook in ls_books:
-        NSAutoreleasePool.alloc().init() # we need this because this func is in another thread, qt can't take care of this
-
         # basic audiobook params
         a_name = audiobook[0]
         a_parts = len(audiobook[1])
